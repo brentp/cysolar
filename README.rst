@@ -7,7 +7,8 @@ port of pysolar_ to cython_
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 all the brain work was done by Brandon of pysolar_ this is a naive port
-for speed.
+for speed. Thanks to Brandon for allowing this to be released under A 
+BSD license.
 
 example usage ::
 

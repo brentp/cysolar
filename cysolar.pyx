@@ -4,6 +4,8 @@ cysolar
 
 port of pysolar to cython. see README.rst
 
+(License is BSD, thanks to Brandon)
+
 """
 DEF DELTA_SECONDS = 65.0
 DEF PI = 3.1415926535897931
