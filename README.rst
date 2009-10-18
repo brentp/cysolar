@@ -12,11 +12,12 @@ BSD license.
 
 example usage ::
 
-    >>> from cysolar get_radiation
+    >>> from cysolar import get_radiation
     >>> import datetime
     >>> d = datetime.datetime(2007, 2, 18, 20, 13, 1, 130320)
     >>> lon, lat = -71.382, 42.206
     >>> get_radiation(d, lon, lat)
+    803.57188602589667
 
 
 
