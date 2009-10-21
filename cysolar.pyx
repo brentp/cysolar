@@ -33,6 +33,9 @@ cdef extern from "solar_constants.h":
 
     double aberration_poly(double jce, double a, double b, double c, double d)
 
+    int get_day_of_year(int y, int m, int d)
+    int months[12]
+
 cdef extern from "math.h":
     double sin(double x)
     double exp(double x)
@@ -96,9 +99,10 @@ cdef inline double air_mass_ratio(double altitude_deg):
     return 1.0 / sin(radians(altitude_deg))
 
 cdef inline double apparent_extraterrestrial_flux(unsigned int day):
-    # from Masters, p. 412
+    # from Masters, p. 412 W / m*m
     return 1160.0 + (75.0 * sin((360.0/365.0) * (day - 275.0)))
 
+# Renewable and efficient electric power systems By Gilbert M. Masters
 cdef inline double optical_depth(unsigned int day):
     # from Masters, p. 412
     return 0.174 + (0.035 * sin((360.0 / 365) * (day - 100.0)))
@@ -304,12 +308,14 @@ cdef double get_topocentric_elevation_angle(double latitude,
 cdef inline double get_refraction_correction(double pressure_millibars, 
                                              double temperature_celsius,
                                              double topocentric_elevation_angle):
-     cdef double tea = topocentric_elevation_angle
-     cdef double temperature_kelvin = temperature_celsius + 273.15
-     cdef double a = pressure_millibars * 283.0 * 1.02
-     cdef double b = 1010.0 * temperature_kelvin * 60.0 *\
+    cdef double tea = topocentric_elevation_angle
+    cdef double temperature_kelvin = temperature_celsius + 273.15
+    cdef double a = pressure_millibars * 283.0 * 1.02
+    cdef double b = 1010.0 * temperature_kelvin * 60.0 *\
                         tan(radians(tea + (10.3/(tea + 5.11))))
-     return a / b
+    return a / b
+
+
 
 # NOTE: this is lon, lat order where as the python is lat, lon
 # to maintain compatibility with pysolar.
@@ -392,7 +398,7 @@ cdef inline double get_optical_depth(double day):
     return 0.174 + (0.035 * sin((360.0/365.0) * (day - 100)))
 
 import datetime
-def get_day_of_year(utc_datetime):
+def py_get_day_of_year(utc_datetime):
     year_start = datetime.datetime(utc_datetime.year, 1, 1)
     delta = (utc_datetime - year_start)
     return delta.days
@@ -427,10 +433,42 @@ def get_radiation(adatetime, double lon, double lat,
                                         d.microsecond, elevation,
                                         temperature_celsius,
                                         pressure_millibars)
-    cdef unsigned int day = get_day_of_year(adatetime)
-    cdef double flux, optical_depth, air_mass_ratio
+    cdef unsigned int day = py_get_day_of_year(adatetime)
     return _radiation(day, alt_deg)
 
+
+def get_radiation_for_year(year, lon, lat, elevation):
+    cdef double temp_c = 25.0
+    cdef double pressure = 1013.0
+    cdef unsigned month, day, day_of_y = 0, hour, minute, i
+
+    cdef double rads[366]
+    cdef double daily_rad, alt_deg, flux, optical_depth, air_mass_ratio
+
+    ops = []
+    fluxs = []
+    for month in range(12):
+        for day in range(1, months[month] + 1):
+            day_of_y += 1
+            daily_rad = 0.0;
+            flux = get_apparent_extraterrestrial_flux(day_of_y)
+            optical_depth = get_optical_depth(day_of_y)
+            ops.append(optical_depth)
+            fluxs.append(flux)
+            print "%.3f, %.3f" % (flux, optical_depth)
+            for hour in range(0, 24):
+                for minute in range(0, 60):
+                    alt_deg = cget_altitude(lon, lat, year, month,
+                                        day, hour, minute, 0,
+                                        0, elevation,
+                                        temp_c,
+                                        pressure)
+                    if alt_deg > 0: 
+                        air_mass_ratio = get_air_mass_ratio(alt_deg)
+                        daily_rad += (flux * exp(-1.0 * optical_depth * \
+                                             air_mass_ratio))
+            rads[day_of_y - 1] = daily_rad / (24 * 60)
+    return [rads[i] for i in range(365)], ops, fluxs
 
 cdef double _radiation(unsigned int day, double altitude_deg):
     if altitude_deg <= 0: return 0.0
@@ -463,5 +501,5 @@ cpdef get_radiation_direct(utc_datetime, double altitude_deg):
     # from Masters, p. 412
     cdef unsigned int day
     if altitude_deg <= 0: return 0.0
-    day = get_day_of_year(utc_datetime)
+    day = py_get_day_of_year(utc_datetime)
     return _radiation(day, altitude_deg)
